@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-  Routes,
-  Route,
-  Navigate,
-  useNavigate,
-  useLocation,
-} from "react-router-dom";
+
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Toaster, toast } from "react-hot-toast";
 
 import api from "./lib/api";
@@ -37,9 +32,7 @@ function AdminOnly({ me, children }) {
 function Home() {
   return (
     <div className="page-fade section">
-      <h2 className="text-3xl font-semibold title-glow mb-2">
-        Welcome to H2H Thailand
-      </h2>
+      <h2 className="text-3xl font-semibold title-glow mb-2">Welcome to H2H Thailand</h2>
       <p className="text-[var(--fg-muted)] max-w-2xl">
         ระบบ H2H Digital Silk UI — โทน Blue–Gold + Glassmorphism พร้อมการจัดการผู้ใช้
         สินค้า การชำระเงิน และโทเคนแบบครบวงจร 💙🟨
@@ -64,13 +57,12 @@ export default function App() {
       return;
     }
     try {
-      // ✅ แนบ Authorization header ด้วย token
+      // จะส่ง headers เองหรือไม่ส่งก็ได้ ถ้า api() แนบ token อัตโนมัติอยู่แล้ว
       const res = await api("/api/auth/profile", {
         headers: { Authorization: `Bearer ${tok}` },
       });
       setMe(res.user || null);
     } catch {
-      // token เสีย/หมดอายุ เคลียร์ทิ้ง
       setToken("");
       setMe(null);
     } finally {
@@ -78,14 +70,15 @@ export default function App() {
     }
   }
 
-  useEffect(() => { fetchMe(); }, []);
+  useEffect(() => {
+    fetchMe();
+  }, []);
 
   async function handleLoggedIn(token) {
     setToken(token);
     toast.success("✅ Logged in successfully!");
-    // ดึงโปรไฟล์ก่อน แล้วค่อยเด้งไป /items
-    await fetchMe();
-    navigate("/items");
+    await fetchMe();        // ดึง me ให้พร้อมก่อน
+    navigate("/items");     // แล้วค่อยพาเข้าหน้า Items
   }
 
   function handleLogout() {
@@ -114,7 +107,7 @@ export default function App() {
           <Route path="/login" element={<Login onLoggedIn={handleLoggedIn} />} />
           <Route path="/register" element={<Register onLoggedIn={handleLoggedIn} />} />
 
-          {/* App Layout (แสดงเมนู/เค้าโครงได้ แม้ยังไม่ล็อกอิน, แต่เพจสำคัญคุ้มด้วย Protected) */}
+          {/* App Layout */}
           <Route element={<H2HLayout me={me} onLogout={handleLogout} />}>
             <Route index element={<Navigate to="/items" />} />
             <Route path="/" element={<Home />} />

@@ -1,71 +1,114 @@
-import React, { useEffect, useState } from "react";
-import { api } from "../api";
+// frontend/src/pages/Profile.jsx
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import api from "../lib/api";
+import { getToken } from "../lib/auth";
 
-export default function Profile({ me, toast }) {
-  const [p, setP] = useState(null);
-  const [msg, setMsg] = useState("");
+export default function Profile({ me: meFromApp, toast }) {
+  const [me, setMe] = useState(meFromApp || null);
+  const [loading, setLoading] = useState(!meFromApp);
+  const [error, setError] = useState("");
 
   async function load() {
-    setMsg("");
-    try { const res = await api("/api/profiles/me", { auth: true }); setP(res.profile); }
-    catch (e) { setMsg(e.message); }
-  }
-  useEffect(() => { if (me) load(); }, [me]);
-
-  async function save(e) {
-    e.preventDefault();
+    const token = getToken();
+    if (!token) {
+      setError("ยังไม่ได้ล็อกอิน");
+      setLoading(false);
+      setMe(null);
+      return;
+    }
     try {
-      const payload = { displayName: p.displayName||"", bio: p.bio||"", avatarUrl: p.avatarUrl||"", phone: p.phone||"", address: p.address||{}, socials: p.socials||{} };
-      const res = await api("/api/profiles/me", { method:"PUT", body: payload, auth: true });
-      setP(res.profile); toast.success("Saved!");
-    } catch (e) { toast.error(e.message); }
+      setLoading(true);
+      setError("");
+      const res = await api("/api/auth/profile"); // api ใส่ Authorization ให้อัตโนมัติแล้ว
+      setMe(res.user || null);
+    } catch (e) {
+      setError(e.message || "โหลดโปรไฟล์ไม่สำเร็จ");
+      setMe(null);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  if (!me) return <div>Please login</div>;
-  if (!p) return <div className="text-white/70">Loading profile...</div>;
+  // ถ้า App ส่ง me มาพร้อมแล้วก็ไม่ต้องโหลดอีก แต่ถ้ากด F5 มาหน้านี้ตรง ๆ ให้ดึงเอง
+  useEffect(() => {
+    if (meFromApp) {
+      setMe(meFromApp);
+      setLoading(false);
+      setError("");
+    } else {
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meFromApp?._id]); // เมื่อ App อัปเดต me ให้ซิงก์เข้ามา
+
+  if (loading) {
+    return (
+      <div className="text-[var(--fg-muted)]">Loading profile...</div>
+    );
+  }
+
+  if (!getToken()) {
+    return (
+      <div className="space-y-2">
+        <div className="text-[var(--fg-muted)]">ยังไม่ได้ล็อกอิน</div>
+        <Link to="/login" className="underline">ไปหน้า Login</Link>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-3">
+        <div className="text-red-400">โหลดโปรไฟล์ไม่สำเร็จ: {error}</div>
+        <button
+          className="px-3 py-2 rounded-lg bg-white/10 border border-white/10"
+          onClick={load}
+        >
+          ลองใหม่
+        </button>
+      </div>
+    );
+  }
+
+  if (!me) {
+    return (
+      <div className="space-y-3">
+        <div className="text-[var(--fg-muted)]">ไม่พบข้อมูลผู้ใช้</div>
+        <button
+          className="px-3 py-2 rounded-lg bg-white/10 border border-white/10"
+          onClick={load}
+        >
+          Refresh
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="grid gap-4 max-w-3xl">
-      <div className="card">
-        <h4 className="text-bro-gold mb-2">Auth (read-only)</h4>
-        <pre className="text-sm overflow-auto">{JSON.stringify(me, null, 2)}</pre>
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold title-glow">My Profile</h1>
+
+      <div className="rounded-2xl border border-white/10 p-4 bg-white/5 space-y-2">
+        <div><span className="text-[var(--fg-muted)]">_id:</span> {me._id}</div>
+        <div><span className="text-[var(--fg-muted)]">name:</span> {me.name}</div>
+        <div><span className="text-[var(--fg-muted)]">role:</span> {me.role}</div>
       </div>
 
-      <form onSubmit={save} className="card grid gap-3">
-        <h4 className="text-bro-gold">Profile (profile_db)</h4>
-        <input className="input" value={p.displayName||""} onChange={e=>setP({...p,displayName:e.target.value})} placeholder="displayName" />
-        <input className="input" value={p.avatarUrl||""} onChange={e=>setP({...p,avatarUrl:e.target.value})} placeholder="avatarUrl" />
-        <input className="input" value={p.phone||""} onChange={e=>setP({...p,phone:e.target.value})} placeholder="phone" />
-        <textarea className="textarea" value={p.bio||""} onChange={e=>setP({...p,bio:e.target.value})} placeholder="bio" rows={4} />
-
-        <fieldset className="border border-white/10 rounded-xl p-3">
-          <legend className="px-2 text-white/70">Address</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input className="input" value={p.address?.line1||""} onChange={e=>setP({...p,address:{...p.address,line1:e.target.value}})} placeholder="line1" />
-            <input className="input" value={p.address?.line2||""} onChange={e=>setP({...p,address:{...p.address,line2:e.target.value}})} placeholder="line2" />
-            <input className="input" value={p.address?.city||""} onChange={e=>setP({...p,address:{...p.address,city:e.target.value}})} placeholder="city" />
-            <input className="input" value={p.address?.state||""} onChange={e=>setP({...p,address:{...p.address,state:e.target.value}})} placeholder="state" />
-            <input className="input" value={p.address?.postalCode||""} onChange={e=>setP({...p,address:{...p.address,postalCode:e.target.value}})} placeholder="postalCode" />
-            <input className="input" value={p.address?.country||""} onChange={e=>setP({...p,address:{...p.address,country:e.target.value}})} placeholder="country" />
-          </div>
-        </fieldset>
-
-        <fieldset className="border border-white/10 rounded-xl p-3">
-          <legend className="px-2 text-white/70">Socials</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input className="input" value={p.socials?.github||""} onChange={e=>setP({...p,socials:{...p.socials,github:e.target.value}})} placeholder="github" />
-            <input className="input" value={p.socials?.facebook||""} onChange={e=>setP({...p,socials:{...p.socials,facebook:e.target.value}})} placeholder="facebook" />
-            <input className="input" value={p.socials?.twitter||""} onChange={e=>setP({...p,socials:{...p.socials,twitter:e.target.value}})} placeholder="twitter" />
-            <input className="input" value={p.socials?.instagram||""} onChange={e=>setP({...p,socials:{...p.socials,instagram:e.target.value}})} placeholder="instagram" />
-            <input className="input" value={p.socials?.website||""} onChange={e=>setP({...p,socials:{...p.socials,website:e.target.value}})} placeholder="website" />
-          </div>
-        </fieldset>
-
-        <div className="flex gap-2 justify-end">
-          <button type="submit" className="btn btn-gold">Save</button>
-        </div>
-        {msg && <div className="text-red-400">{msg}</div>}
-      </form>
+      <div className="flex items-center gap-2">
+        <button
+          className="px-3 py-2 rounded-lg bg-white/10 border border-white/10"
+          onClick={() => {
+            load();
+            toast?.("Refreshing profile…");
+          }}
+        >
+          Refresh
+        </button>
+        <Link to="/items" className="px-3 py-2 rounded-lg bg-blue-700 text-white">
+          ไปหน้า Items
+        </Link>
+      </div>
     </div>
   );
 }
